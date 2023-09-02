@@ -1,8 +1,11 @@
+import multiprocessing
+
 from train import generate_data
 from time import sleep
 from threading import Thread
 import pygame
-from multiprocessing import Process
+from multiprocessing import Process, Pipe
+import time
 
 
 # pong game
@@ -12,15 +15,27 @@ from multiprocessing import Process
 
 
 
-def capture_process():
-    global running
+def capture_process(event):
+    running = True
+    start_time = time.time_ns()
+    datas = []
     while running:
-        data = next(generate_data())
-        print(data)
+        datas.append(next(generate_data()))
+        if time.time_ns() - start_time > 1000000000:
+            event.set()
+            start_time = time.time_ns()
+            print(len(datas))
+            datas = []
 
 
 
 if __name__ == "__main__":
+
+    process_event = multiprocessing.Event()
+
+    p = Process(target=capture_process, args=(process_event,))
+    p.start()
+
     pygame.init()
     # screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
     screen = pygame.display.set_mode((1280, 720))
@@ -28,8 +43,7 @@ if __name__ == "__main__":
     running = True
     booly = True
 
-    p = Process(target=capture_process)
-    p.start()
+
 
 
     while running:
@@ -42,10 +56,8 @@ if __name__ == "__main__":
         # fill the screen with a color to wipe away anything from last frame
         if (booly):
             screen.fill("black")
-            booly = False
         else:
             screen.fill("white")
-            booly = True
 
         # RENDER YOUR GAME HERE
         keys = pygame.key.get_pressed()
@@ -53,8 +65,15 @@ if __name__ == "__main__":
             running = False
 
         # update the display
-
         pygame.display.flip()
-        clock.tick(1)
+        clock.tick(60)
+        if process_event.is_set():
+            booly = not booly
+            process_event.clear()
+
+
+
+
+
     pygame.quit()
     p.kill()
