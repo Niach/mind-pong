@@ -17,7 +17,7 @@ from models import EEGSample, EEGData
 
 def capture_process(left_event, right_event, rest_event):
     ip = "127.0.0.1"
-    port = 1000
+    port = 10000
 
     listening_address = (ip, port)
 

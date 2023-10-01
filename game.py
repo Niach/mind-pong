@@ -2,8 +2,8 @@ import pygame
 
 
 class PongGame:
-    WIDTH = 1920
-    HEIGHT = 1080
+    WIDTH = 1280
+    HEIGHT = 720
 
     @classmethod
     def draw_arrow_left(cls, screen):
