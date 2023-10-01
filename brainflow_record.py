@@ -6,72 +6,34 @@ from multiprocessing import Process
 from pprint import pprint
 
 import numpy as np
-from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds, BrainFlowPresets
+import pygame
+from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 
-from game import PongGame
+import random
+
+WIDTH = 1280
+HEIGHT = 1080
+
+PLAYER_WIDTH_MOD = 0.2
+PLAYER_HEIGHT_MOD = 0.02
+
+BALL_WIDTH_MOD = 0.02
+BALL_HEIGHT_MOD = 0.02
 
 
-
-def capture_process(left_event, right_event, rest_event):
+def start_capture():
     BoardShim.enable_dev_board_logger()
 
     params = BrainFlowInputParams()
     board = BoardShim(BoardIds.UNICORN_BOARD, params)
     board.prepare_session()
-    eeg_channels = BoardShim.get_eeg_channels(BoardIds.UNICORN_BOARD) #0-8
     pprint(BoardShim.get_board_descr(BoardIds.UNICORN_BOARD))
-    running = True
-    recording_states = ["LEFT", "RIGHT", "REST", "REST", "REST"]
-    current_state = "REST"
-
-    create_class_directories(recording_states)
-
-    rest_event.set()
-
-    start_time = time.time_ns()
-    is_first_sample = True
 
     board.start_stream()
-    while running:
-        time.sleep(1)
-        data = board.get_board_data()
-        eeg_data = data[eeg_channels, :]
-        eeg_np = np.asarray(eeg_data)
-        np.savetxt('data/raw/' + current_state + '/' + str(time.time_ns()) + '.csv', eeg_np, delimiter=",")
-        print(len(eeg_data))
 
+    board.insert_marker(1)
 
-
-        pass
-
-
-        # if number_of_bytes_received > 0:
-        #     message_byte = np.frombuffer(data, dtype=np.uint8, count=number_of_bytes_received)
-        #     message = message_byte.tobytes().decode('ascii')
-        #     data_list: list[float] = [float(item) for item in message.split(',')]
-        #     eeg_data = EEGData(channelData=data_list, timestamp=time.time_ns())
-        #     datas.append(eeg_data)
-        #
-        # if time.time_ns() - start_time > 5000000000:
-        #     sample = EEGSample(datas, start_time, time.time_ns(), current_state)
-        #     current_state = random.choice(recording_states)
-        #     datas = []
-        #
-        #     if current_state == "LEFT":
-        #         left_event.set()
-        #     elif current_state == "RIGHT":
-        #         right_event.set()
-        #     elif current_state == "REST":
-        #         rest_event.set()
-        #
-        #     if not is_first_sample:
-        #         with open('data/raw/' + current_state + '/' + str(time.time_ns()) + '.pickle', 'wb') as f:
-        #             pickle.dump(sample, f, pickle.HIGHEST_PROTOCOL)
-        #
-        #     else:
-        #         is_first_sample = False
-        #
-        #     start_time = time.time_ns()
+    return board
 
 
 def create_class_directories(classes):
@@ -81,18 +43,183 @@ def create_class_directories(classes):
             os.makedirs(raw)
 
 
+class Player(pygame.Rect):
+
+    def __init__(self, x, y):
+        super().__init__(x, y, WIDTH * PLAYER_WIDTH_MOD, HEIGHT * PLAYER_HEIGHT_MOD)
+        self.vx = 0
+        self.beep_left = Beep(True)
+        self.beep_right = Beep(False)
+        self.last_left_pressed = False
+        self.last_right_pressed = False
+
+    def render(self, screen):
+        pygame.draw.rect(screen, "white",
+                         pygame.Rect(self.x, self.y, self.width, self.height))
+
+    def update(self, keys, dt, board):
+
+        if keys[pygame.K_LCTRL]:
+            self.vx = -300
+            self.beep_right.stop()
+            self.beep_left.play()
+            self.last_right_pressed = False
+
+            if not self.last_left_pressed:
+                board.insert_marker(1)
+                self.last_left_pressed = True
+
+        elif keys[pygame.K_RCTRL]:
+            self.vx = 300
+            self.beep_left.stop()
+            self.beep_right.play()
+            self.last_left_pressed = False
+            if not self.last_right_pressed:
+                board.insert_marker(2)
+                self.last_right_pressed = True
+
+        else:
+            self.vx = 0
+            self.beep_left.stop()
+            self.beep_right.stop()
+
+            if self.last_left_pressed or self.last_right_pressed:
+                board.insert_marker(3)
+
+            self.last_left_pressed = False
+            self.last_right_pressed = False
+
+        self.x += self.vx * dt
 
 
+class Ball(pygame.Rect):
+
+    def __init__(self, x, y):
+        super().__init__(x, y, WIDTH * BALL_WIDTH_MOD, HEIGHT * BALL_HEIGHT_MOD)
+        self.vx = 0
+        self.vy = 250
+
+    def render(self, screen):
+        pygame.draw.rect(screen, "white", self)
+
+    def update(self, player, boxes, dt):
+        self.x += self.vx * dt
+        self.y += self.vy * dt
+
+        if self.x <= 0 or self.x >= WIDTH:
+            self.vx = -self.vx
+
+        if self.y <= 0 or self.y >= HEIGHT:
+            self.vy = -self.vy
+
+        if self.colliderect(player):
+            self.vy = -self.vy
+            self.vx = self.vx + random.randint(-100, 100)
+            if self.vx > 500:
+                self.vx = 500
+            elif self.vx < -500:
+                self.vx = -500
+
+        for box in boxes:
+            if self.colliderect(box):
+                self.vy = -self.vy
+                boxes.remove(box)
+                break
+
+
+class Box(pygame.Rect):
+    def __init__(self, x, y):
+        super().__init__(x, y, WIDTH / 11, HEIGHT * 2 * BALL_HEIGHT_MOD)
+
+    def render(self, screen):
+        pygame.draw.rect(screen, "white", self)
+
+
+class Beep:
+
+    def __init__(self, is_left):
+        # Constants
+        FS = 44100  # Sampling rate
+        T = 5  # Duration in seconds
+        FREQ = 100  # Frequency in Hz
+
+        # Generate the sine wave samples for the left channel
+        t = np.linspace(0, T, int(FS * T), endpoint=False)  # Time array
+        sin_channel = np.sin(2 * np.pi * FREQ * t)
+
+        if is_left:
+            left_channel_pcm = (32767 * sin_channel).astype(np.int16)
+            right_channel_pcm = np.zeros(left_channel_pcm.shape, dtype=np.int16)
+        else:
+            right_channel_pcm = (32767 * sin_channel).astype(np.int16)
+            left_channel_pcm = np.zeros(right_channel_pcm.shape, dtype=np.int16)
+
+        # Combine both channels
+        stereo_pcm = np.column_stack((left_channel_pcm, right_channel_pcm))
+
+        pygame.mixer.init(FS, -16, 2)
+        self.sound = pygame.sndarray.make_sound(stereo_pcm)
+
+    def play(self):
+        if not pygame.mixer.get_busy():
+            self.sound.play()
+
+    def stop(self):
+        self.sound.stop()
+
+
+
+def save_sample(board):
+    data = board.get_board_data()
+    eeg_channels = BoardShim.get_eeg_channels(BoardIds.UNICORN_BOARD)  # 0-8
+    marker_channel = BoardShim.get_marker_channel(BoardIds.UNICORN_BOARD)
+    eeg_data = data[eeg_channels, :]
+    eeg_data.append(data[marker_channel, :])
+    eeg_np = np.asarray(eeg_data)
+
+    np.savetxt('data/raw/' + str(time.time_ns()) + '.csv', eeg_np, delimiter=",")
 
 if __name__ == "__main__":
-    left_event = multiprocessing.Event()
-    right_event = multiprocessing.Event()
-    rest_event = multiprocessing.Event()
+    create_class_directories(["LEFT", "RIGHT", "REST"])
 
-    p = Process(target=capture_process, args=(left_event, right_event, rest_event))
-    p.start()
+    board = start_capture()
+    running = True
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    clock = pygame.time.Clock()
+    dt = 0
+    player = Player(WIDTH * 0.5 - (0.5 * PLAYER_WIDTH_MOD * WIDTH), HEIGHT - (2 * PLAYER_HEIGHT_MOD * HEIGHT))
+    ball = Ball(WIDTH * 0.5 - (0.5 * BALL_WIDTH_MOD * WIDTH), HEIGHT * 0.5 - (2 * BALL_HEIGHT_MOD * HEIGHT))
+    boxes = []
 
-    game = PongGame(left_event, right_event, rest_event)
-    game.run()
+    current_time = time.time()
 
-    p.kill()
+    for i in range(10):
+        for j in range(4):
+            boxes.append(Box((WIDTH / 11 / 10 / 2) + WIDTH * 0.1 * i,
+                             ((2 * BALL_HEIGHT_MOD * HEIGHT) * j + j * (BALL_HEIGHT_MOD * HEIGHT / 2)) + (
+                                         BALL_HEIGHT_MOD * HEIGHT / 2)))
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        screen.fill("black")
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_ESCAPE]:
+            running = False
+
+        ball.update(player, boxes, dt)
+        player.update(keys, dt, board)
+
+        player.render(screen)
+        ball.render(screen)
+        for box in boxes:
+            box.render(screen)
+
+        pygame.display.flip()
+        if time.time() - current_time > 10:
+            current_time = time.time()
+
+        dt = clock.tick(60) / 1000
