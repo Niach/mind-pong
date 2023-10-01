@@ -141,7 +141,7 @@ class Beep:
         # Constants
         FS = 44100  # Sampling rate
         T = 5  # Duration in seconds
-        FREQ = 100  # Frequency in Hz
+        FREQ = 100 if is_left else 110 # Frequency in Hz
 
         # Generate the sine wave samples for the left channel
         t = np.linspace(0, T, int(FS * T), endpoint=False)  # Time array
@@ -223,3 +223,6 @@ if __name__ == "__main__":
             current_time = time.time()
 
         dt = clock.tick(60) / 1000
+
+    board.stop_stream()
+    board.release_session()
