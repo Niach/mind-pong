@@ -57,7 +57,7 @@ class Player(pygame.Rect):
         pygame.draw.rect(screen, "white",
                          pygame.Rect(self.x, self.y, self.width, self.height))
 
-    def update(self, keys, dt, board):
+    def calc(self, keys, dt, board):
 
         if keys[pygame.K_LCTRL]:
             self.vx = -300
@@ -68,6 +68,7 @@ class Player(pygame.Rect):
             if not self.last_left_pressed:
                 board.insert_marker(1)
                 self.last_left_pressed = True
+                print("LEFT")
 
         elif keys[pygame.K_RCTRL]:
             self.vx = 300
@@ -77,6 +78,8 @@ class Player(pygame.Rect):
             if not self.last_right_pressed:
                 board.insert_marker(2)
                 self.last_right_pressed = True
+                print("RIGHT")
+
 
         else:
             self.vx = 0
@@ -85,6 +88,8 @@ class Player(pygame.Rect):
 
             if self.last_left_pressed or self.last_right_pressed:
                 board.insert_marker(3)
+                print("CLEAR")
+
 
             self.last_left_pressed = False
             self.last_right_pressed = False
@@ -174,7 +179,7 @@ def save_sample(board):
     eeg_channels = BoardShim.get_eeg_channels(BoardIds.UNICORN_BOARD)  # 0-8
     marker_channel = BoardShim.get_marker_channel(BoardIds.UNICORN_BOARD)
     eeg_data = data[eeg_channels, :]
-    eeg_data.append(data[marker_channel, :])
+    eeg_data = np.append(eeg_data, [data[marker_channel, :]], axis=0)
     eeg_np = np.asarray(eeg_data)
 
     np.savetxt('data/raw/' + str(time.time_ns()) + '.csv', eeg_np, delimiter=",")
@@ -211,7 +216,7 @@ if __name__ == "__main__":
             running = False
 
         ball.update(player, boxes, dt)
-        player.update(keys, dt, board)
+        player.calc(keys, dt, board)
 
         player.render(screen)
         ball.render(screen)
@@ -221,6 +226,7 @@ if __name__ == "__main__":
         pygame.display.flip()
         if time.time() - current_time > 10:
             current_time = time.time()
+            save_sample(board)
 
         dt = clock.tick(60) / 1000
 

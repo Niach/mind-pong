@@ -1,14 +1,9 @@
-import array
-import random
+
 import time
 
-import numpy as np
 import torch
-from torch.utils.data import Dataset
 from torch.utils.data import DataLoader, random_split
 import torch.nn as nn
-import pickle
-import os
 
 from inference import predict
 from models import EEGSample, classes, map_sample, EEGDataset, EEGNet
@@ -39,7 +34,7 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs):
         # Training loop
         model.train()
         for inputs, labels in train_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.to(device), labels.long().to(device)
             outputs = model(inputs)
             loss = criterion(outputs, labels)
 
@@ -53,7 +48,7 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs):
         val_loss = 0.0
         with torch.no_grad():
             for inputs, labels in val_loader:
-                inputs, labels = inputs.to(device), labels.to(device)
+                inputs, labels = inputs.to(device), labels.long().to(device)
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()
@@ -76,14 +71,13 @@ def evaluate(model, test_loader):
     total = 0
     with torch.no_grad():
         for inputs, labels in test_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.to(device), labels.long().to(device)
             outputs = model(inputs)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
     print(f'Accuracy: {100 * correct / total}%')
     return 100 * correct / total
-
 
 
 

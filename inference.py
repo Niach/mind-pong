@@ -9,7 +9,7 @@ import torch
 import pygame
 
 from game import PongGame
-from models import classes, EEGData, EEGSample, map_sample, EEGNet
+from models import classes, map_sample, EEGNet
 
 
 def predict(model, inputs):
@@ -51,31 +51,32 @@ def capture_process(left_event, right_event, rest_event):
     datas = []
 
     while running:
-        (data, _) = dg_socket.recvfrom(1024)
-        number_of_bytes_received = len(data)
-
-        if number_of_bytes_received > 0:
-            message_byte = np.frombuffer(data, dtype=np.uint8, count=number_of_bytes_received)
-            message = message_byte.tobytes().decode('ascii')
-            data_list: list[float] = [float(item) for item in message.split(',')]
-            eeg_data = EEGData(channelData=data_list, timestamp=time.time_ns())
-            datas.append(eeg_data)
-
-        if time.time_ns() - start_time > 5000000000:
-            sample = EEGSample(datas, start_time, time.time_ns(), current_state)
-
-            input = torch.tensor(map_sample(sample)).float().unsqueeze(0)
-            current_state = predict(model, input)[0]
-            print("predicted state:", current_state)
-
-            if current_state == "LEFT":
-                left_event.set()
-            elif current_state == "RIGHT":
-                right_event.set()
-            elif current_state == "REST":
-                rest_event.set()
-
-            start_time = time.time_ns()
+        pass
+        # (data, _) = dg_socket.recvfrom(1024)
+        # number_of_bytes_received = len(data)
+        #
+        # if number_of_bytes_received > 0:
+        #     message_byte = np.frombuffer(data, dtype=np.uint8, count=number_of_bytes_received)
+        #     message = message_byte.tobytes().decode('ascii')
+        #     data_list: list[float] = [float(item) for item in message.split(',')]
+        #     eeg_data = EEGData(channelData=data_list, timestamp=time.time_ns())
+        #     datas.append(eeg_data)
+        #
+        # if time.time_ns() - start_time > 5000000000:
+        #     sample = EEGSample(datas, start_time, time.time_ns(), current_state)
+        #
+        #     input = torch.tensor(map_sample(sample)).float().unsqueeze(0)
+        #     current_state = predict(model, input)[0]
+        #     print("predicted state:", current_state)
+        #
+        #     if current_state == "LEFT":
+        #         left_event.set()
+        #     elif current_state == "RIGHT":
+        #         right_event.set()
+        #     elif current_state == "REST":
+        #         rest_event.set()
+        #
+        #     start_time = time.time_ns()
 
 
 if __name__ == "__main__":
