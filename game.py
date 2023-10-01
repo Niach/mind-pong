@@ -5,31 +5,6 @@ class PongGame:
     WIDTH = 1280
     HEIGHT = 720
 
-    @classmethod
-    def draw_arrow_left(cls, screen):
-        pygame.draw.polygon(screen, "white",
-                            [(cls.WIDTH * 0.5 - cls.WIDTH * 0.039, cls.HEIGHT * 0.139),
-                             (cls.WIDTH * 0.5 - cls.WIDTH * 0.039, cls.HEIGHT * 0.278),
-                             (cls.WIDTH * 0.5 - cls.WIDTH * 0.117, cls.HEIGHT * 0.208)])
-        pygame.draw.rect(screen, "white",
-                         pygame.Rect(cls.WIDTH * 0.5 - cls.WIDTH * 0.039, cls.HEIGHT * 0.187, cls.WIDTH * 0.078,
-                                     cls.HEIGHT * 0.042))
-
-    @classmethod
-    def draw_arrow_right(cls, screen):
-        pygame.draw.polygon(screen, "white",
-                            [(cls.WIDTH * 0.5 + cls.WIDTH * 0.039, cls.HEIGHT * 0.139),
-                             (cls.WIDTH * 0.5 + cls.WIDTH * 0.039, cls.HEIGHT * 0.278),
-                             (cls.WIDTH * 0.5 + cls.WIDTH * 0.117, cls.HEIGHT * 0.208)])
-        pygame.draw.rect(screen, "white",
-                         pygame.Rect(cls.WIDTH * 0.5 - cls.WIDTH * 0.039, cls.HEIGHT * 0.187, cls.WIDTH * 0.078,
-                                     cls.HEIGHT * 0.042))
-
-    @classmethod
-    def draw_rest(cls, screen):
-        pygame.draw.circle(screen, "white", (cls.WIDTH * 0.5, cls.HEIGHT * 0.208), cls.WIDTH * 0.039)
-        pygame.draw.circle(screen, "black", (cls.WIDTH * 0.5, cls.HEIGHT * 0.208), cls.WIDTH * 0.023)
-
     def __init__(self, left_event, right_event, rest_event):
         self.left_event = left_event
         self.right_event = right_event
