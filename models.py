@@ -98,7 +98,7 @@ class EEGDataset(Dataset):
             DataFilter.perform_bandstop(eeg_data[i], 250, 48.0, 52.0, 4,
                                         FilterTypes.BUTTERWORTH.value, 0)
 
-        # Apply a bandpass filter from 8-30 Hz to isolate the motor imagery related frequency components
+        # Apply a bandpass filter from 2-30 Hz to isolate the motor imagery related frequency components
         for i in range(eeg_data.shape[0]):
             DataFilter.perform_bandpass(eeg_data[i], 250, 2.0, 30.0, 4, FilterTypes.BUTTERWORTH.value, 0)
 
