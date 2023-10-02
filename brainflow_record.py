@@ -8,6 +8,7 @@ from pprint import pprint
 import numpy as np
 import pygame
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
+from brainflow.data_filter import DataFilter
 
 import random
 
@@ -36,11 +37,10 @@ def start_capture():
     return board
 
 
-def create_class_directories(classes):
-    for class_ in classes:
-        raw = os.path.join("data", "raw", class_)
-        if not os.path.exists(raw):
-            os.makedirs(raw)
+def create_class_directories():
+    raw = os.path.join("data", "raw")
+    if not os.path.exists(raw):
+        os.makedirs(raw)
 
 
 class Player(pygame.Rect):
@@ -90,7 +90,6 @@ class Player(pygame.Rect):
                 board.insert_marker(3)
                 print("CLEAR")
 
-
             self.last_left_pressed = False
             self.last_right_pressed = False
 
@@ -119,11 +118,11 @@ class Ball(pygame.Rect):
 
         if self.colliderect(player):
             self.vy = -self.vy
-            self.vx = self.vx + random.randint(-75, 75)
-            if self.vx > 250:
-                self.vx = 250
-            elif self.vx < -250:
-                self.vx = -250
+            self.vx = self.vx + random.randint(-125, 125)
+            if self.vx > 500:
+                self.vx = 500
+            elif self.vx < -500:
+                self.vx = -500
 
         for box in boxes:
             if self.colliderect(box):
@@ -146,7 +145,7 @@ class Beep:
         # Constants
         FS = 44100  # Sampling rate
         T = 5  # Duration in seconds
-        FREQ = 100 if is_left else 110 # Frequency in Hz
+        FREQ = 100 if is_left else 110  # Frequency in Hz
 
         # Generate the sine wave samples for the left channel
         t = np.linspace(0, T, int(FS * T), endpoint=False)  # Time array
@@ -172,20 +171,22 @@ class Beep:
     def stop(self):
         self.sound.stop()
 
-
-
+is_first_sample = True
 def save_sample(board):
+    global is_first_sample
     data = board.get_board_data()
     eeg_channels = BoardShim.get_eeg_channels(BoardIds.UNICORN_BOARD)  # 0-8
     marker_channel = BoardShim.get_marker_channel(BoardIds.UNICORN_BOARD)
     eeg_data = data[eeg_channels, :]
     eeg_data = np.append(eeg_data, [data[marker_channel, :]], axis=0)
-    eeg_np = np.asarray(eeg_data)
 
-    np.savetxt('data/raw/' + str(time.time_ns()) + '.csv', eeg_np, delimiter=",")
+    if not is_first_sample:
+        DataFilter.write_file(eeg_data, 'data/raw/' + str(time.time_ns()) + '.csv', 'w')
+    else:
+        is_first_sample = False
 
 if __name__ == "__main__":
-    create_class_directories(["LEFT", "RIGHT", "REST"])
+    create_class_directories()
 
     board = start_capture()
     running = True
@@ -203,7 +204,7 @@ if __name__ == "__main__":
         for j in range(4):
             boxes.append(Box((WIDTH / 11 / 10 / 2) + WIDTH * 0.1 * i,
                              ((2 * BALL_HEIGHT_MOD * HEIGHT) * j + j * (BALL_HEIGHT_MOD * HEIGHT / 2)) + (
-                                         BALL_HEIGHT_MOD * HEIGHT / 2)))
+                                     BALL_HEIGHT_MOD * HEIGHT / 2)))
 
     while running:
         for event in pygame.event.get():

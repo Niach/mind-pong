@@ -40,14 +40,17 @@ state_to_idx = {
 
 
 def plot_eeg(data, title, sample_rate=250.0):
-    time = np.arange(data.shape[1]) / sample_rate
-    for channel in data:
-        plt.plot(time, channel)
-    plt.title(title)
-    plt.xlabel('Time (s)')
-    plt.ylabel('Amplitude')
-    plt.legend([f'Channel {i+1}' for i in range(data.shape[0])])
+    print(data.shape)
+    print("dataT:")
+    print(data.T)
+   # plot eeg data over time
+    fig, ax = plt.subplots(1, 1, figsize=(12, 4))
+    ax.plot(np.arange(data.shape[1]) / sample_rate, data.T)
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Voltage [uV]')
+    ax.set_title(title)
     plt.show()
+
 
 
 # dataset class
@@ -59,9 +62,8 @@ class EEGDataset(Dataset):
         self.window_labels = []
 
         for csv_file in os.listdir('data/raw'):
-            with open(os.path.join('data/raw', csv_file), 'rb') as f:
-                data = np.loadtxt(f, delimiter=',')
-                eeg_data = data[:-1, :]
+            data = DataFilter.read_file(os.path.join('data/raw', csv_file))
+            eeg_data = data[:-1, :]
 
                 plot_eeg(eeg_data, 'raw')
                 eeg_data = self.apply_filters(eeg_data)
@@ -95,6 +97,10 @@ class EEGDataset(Dataset):
 
 
     def apply_filters(self, eeg_data):
+        min_values = eeg_data.min(axis=1)[:, np.newaxis]
+        max_values = eeg_data.max(axis=1)[:, np.newaxis]
+        eeg_data = ((eeg_data - min_values) / (max_values - min_values)) * 200 - 100
+
         # Apply a notch filter at 50 Hz to remove powerline interference
         for i in range(eeg_data.shape[0]):
             DataFilter.perform_bandstop(eeg_data[i], 250, 48.0, 52.0, 4,
