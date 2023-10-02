@@ -166,10 +166,12 @@ class Beep:
 
     def play(self):
         if not pygame.mixer.get_busy():
-            self.sound.play()
+            pass
+            #self.sound.play()
 
     def stop(self):
-        self.sound.stop()
+        pass
+        #self.sound.stop()
 
 is_first_sample = True
 def save_sample(board):

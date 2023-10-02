@@ -7,6 +7,8 @@ from torch import nn
 from torch.utils.data import Dataset
 
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
+
 classes = ['REST', 'LEFT', 'RIGHT']
 
 
@@ -32,10 +34,11 @@ def map_samples(sample):
 
     return windows, window_labels
 
+
 state_to_idx = {
     3: 0,  # REST
     1: 1,  # LEFT
-    2: 2   # RIGHT
+    2: 2  # RIGHT
 }
 
 
@@ -43,14 +46,13 @@ def plot_eeg(data, title, sample_rate=250.0):
     print(data.shape)
     print("dataT:")
     print(data.T)
-   # plot eeg data over time
+    # plot eeg data over time
     fig, ax = plt.subplots(1, 1, figsize=(12, 4))
     ax.plot(np.arange(data.shape[1]) / sample_rate, data.T)
     ax.set_xlabel('Time [s]')
     ax.set_ylabel('Voltage [uV]')
     ax.set_title(title)
     plt.show()
-
 
 
 # dataset class
@@ -65,10 +67,9 @@ class EEGDataset(Dataset):
             data = DataFilter.read_file(os.path.join('data/raw', csv_file))
             eeg_data = data[:-1, :]
 
-            plot_eeg(eeg_data, 'raw')
+            # plot_eeg(eeg_data, 'raw')
             eeg_data = self.apply_filters(eeg_data)
-            plot_eeg(eeg_data, 'filtered')
-
+            # (eeg_data, 'filtered')
 
             marker_data = data[-1, :]
             # markers lye in the stream like this: 00..00100..00300..00200..00100..00300..00 where 1 indicated the start of a left movement,
@@ -94,7 +95,6 @@ class EEGDataset(Dataset):
             wins, labs = map_samples(sample)
             self.windows.extend(wins)
             self.window_labels.extend(labs)
-
 
     def apply_filters(self, eeg_data):
         min_values = eeg_data.min(axis=1)[:, np.newaxis]
@@ -123,23 +123,71 @@ class EEGDataset(Dataset):
 
 class EEGNet(nn.Module):
     def __init__(self):
-        super(EEGNet, self).__init__()
+        super().__init__()
 
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=(3, 3), padding=(1, 1))  # Convolutional layer
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=(3, 3), padding=(1, 1))  # Convolutional layer
-        # Updating the input dimensions for the fully connected layer
-        self.fc1 = nn.Linear(32 * 8 * 250, 128)  # Fully connected layer
-        self.fc2 = nn.Linear(128, 3)  # Fully connected layer for 3 classes
-        self.dropout = nn.Dropout(0.5)
-        self.relu = nn.ReLU()
+        # First block of conv layers
+        self.conv1 = nn.Conv2d(1, 25, kernel_size=(1, 5))
+        self.conv2 = nn.Conv2d(25, 25, kernel_size=(8, 1))
+        self.batch_norm1 = nn.BatchNorm2d(25)
+        self.pooling1 = nn.MaxPool2d(kernel_size=(1, 2))
+        self.dropout1 = nn.Dropout(0.5)
+
+        # Second block of conv layers
+        self.conv3 = nn.Conv2d(25, 50, kernel_size=(1, 5))
+        self.batch_norm2 = nn.BatchNorm2d(50)
+        self.pooling2 = nn.MaxPool2d(kernel_size=(1, 2))
+        self.dropout2 = nn.Dropout(0.5)
+
+        # Third block of conv layers
+        self.conv4 = nn.Conv2d(50, 100, kernel_size=(1, 5))
+        self.batch_norm3 = nn.BatchNorm2d(100)
+        self.pooling3 = nn.MaxPool2d(kernel_size=(1, 2))
+        self.dropout3 = nn.Dropout(0.5)
+
+        # Fourth block of conv layers
+        self.conv5 = nn.Conv2d(100, 200, kernel_size=(1, 5))
+        self.batch_norm4 = nn.BatchNorm2d(200)
+        self.pooling4 = nn.MaxPool2d(kernel_size=(1, 2))
+        self.dropout4 = nn.Dropout(0.5)
+
+        # Fully connected layers
+        self.fc1 = nn.Linear(2200, 3)  # Update this line to match the shape of x
+        # Adjust the size if your input shape is different
 
     def forward(self, x):
         x = x.unsqueeze(1)  # Adding an extra dimension for channel
-        x = self.relu(self.conv1(x))
-        x = self.dropout(x)
-        x = self.relu(self.conv2(x))
-        x = x.view(x.size(0), -1)  # Flatten
-        x = self.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
+
+        # First block
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.batch_norm1(x)
+        x = F.elu(x)
+        x = self.pooling1(x)
+        x = self.dropout1(x)
+
+        # Second block
+        x = self.conv3(x)
+        x = self.batch_norm2(x)
+        x = F.elu(x)
+        x = self.pooling2(x)
+        x = self.dropout2(x)
+
+        # Third block
+        x = self.conv4(x)
+        x = self.batch_norm3(x)
+        x = F.elu(x)
+        x = self.pooling3(x)
+        x = self.dropout3(x)
+
+        # Fourth block
+        x = self.conv5(x)
+        x = self.batch_norm4(x)
+        x = F.elu(x)
+        x = self.pooling4(x)
+        x = self.dropout4(x)
+
+        # Fully connected layers
+        x = x.view(x.size(0), -1)
+        x = self.fc1(x)
+
         return x
