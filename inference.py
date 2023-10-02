@@ -9,7 +9,7 @@ import torch
 import pygame
 
 from game import PongGame
-from models import classes, map_sample, EEGNet
+from models import classes, EEGNet
 
 
 def predict(model, inputs):

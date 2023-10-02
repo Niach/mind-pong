@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, random_split
 import torch.nn as nn
 
 from inference import predict
-from models import EEGSample, classes, map_sample, EEGDataset, EEGNet
+from models import EEGDataset, EEGNet
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)

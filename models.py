@@ -16,11 +16,21 @@ class EEGSample:
     state: int
 
 
-def map_sample(sample, window_size=100):
-    mid_point = len(sample.data[0]) // 2  # Assuming the data shape is (8, N)
-    start_idx = max(0, mid_point - window_size // 2)
-    end_idx = min(len(sample.data[0]), mid_point + window_size // 2)
-    return (sample.data[:, start_idx:end_idx]).astype(np.float32)
+def map_samples(sample):
+    window_size = 250
+    step_size = 200  # You can adjust this value to have overlapping or non-overlapping windows
+    num_windows = (sample.data.shape[1] - window_size) // step_size + 1
+    windows = []
+    window_labels = []
+
+    for i in range(num_windows):
+        start_idx = i * step_size
+        end_idx = start_idx + window_size
+        window = sample.data[:, start_idx:end_idx].astype(np.float32)
+        windows.append(window)
+        window_labels.append(sample.state)
+
+    return windows, window_labels
 
 state_to_idx = {
     3: 0,  # REST
@@ -45,6 +55,8 @@ class EEGDataset(Dataset):
     def __init__(self):
         self.classes = classes
         self.samples = []
+        self.windows = []
+        self.window_labels = []
 
         for csv_file in os.listdir('data/raw'):
             with open(os.path.join('data/raw', csv_file), 'rb') as f:
@@ -73,28 +85,31 @@ class EEGDataset(Dataset):
 
     def create_and_append_sample(self, eeg_data, state):
         sample = EEGSample(eeg_data, state_to_idx[int(state)])
-        if len(sample.data[0]) > 100:
+        if len(sample.data[0]) > 250:
             self.samples.append(sample)
+            wins, labs = map_samples(sample)
+            self.windows.extend(wins)
+            self.window_labels.extend(labs)
+
 
     def apply_filters(self, eeg_data):
         # Apply a notch filter at 50 Hz to remove powerline interference
         for i in range(eeg_data.shape[0]):
-            DataFilter.perform_bandstop(eeg_data[i], 250, 1.0, 30.0, 3,
+            DataFilter.perform_bandstop(eeg_data[i], 250, 48.0, 52.0, 4,
                                         FilterTypes.BUTTERWORTH.value, 0)
 
         # Apply a bandpass filter from 8-30 Hz to isolate the motor imagery related frequency components
         for i in range(eeg_data.shape[0]):
-            DataFilter.perform_bandstop(eeg_data[i], 250, 8.0, 30.0, 3, FilterTypes.BUTTERWORTH.value, 0)
+            DataFilter.perform_bandpass(eeg_data[i], 250, 2.0, 30.0, 4, FilterTypes.BUTTERWORTH.value, 0)
 
         return eeg_data
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.windows)
 
     def __getitem__(self, idx):
-        sample = self.samples[idx]
-        data = map_sample(sample)
-        label = sample.state
+        data = self.windows[idx]
+        label = self.window_labels[idx]
         return data, label
 
 
@@ -104,7 +119,8 @@ class EEGNet(nn.Module):
 
         self.conv1 = nn.Conv2d(1, 16, kernel_size=(3, 3), padding=(1, 1))  # Convolutional layer
         self.conv2 = nn.Conv2d(16, 32, kernel_size=(3, 3), padding=(1, 1))  # Convolutional layer
-        self.fc1 = nn.Linear(32 * 8 * 100, 128)  # Fully connected layer
+        # Updating the input dimensions for the fully connected layer
+        self.fc1 = nn.Linear(32 * 8 * 250, 128)  # Fully connected layer
         self.fc2 = nn.Linear(128, 3)  # Fully connected layer for 3 classes
         self.dropout = nn.Dropout(0.5)
         self.relu = nn.ReLU()
