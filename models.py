@@ -65,27 +65,27 @@ class EEGDataset(Dataset):
             data = DataFilter.read_file(os.path.join('data/raw', csv_file))
             eeg_data = data[:-1, :]
 
-                plot_eeg(eeg_data, 'raw')
-                eeg_data = self.apply_filters(eeg_data)
-                plot_eeg(eeg_data, 'filtered')
+            plot_eeg(eeg_data, 'raw')
+            eeg_data = self.apply_filters(eeg_data)
+            plot_eeg(eeg_data, 'filtered')
 
 
-                marker_data = data[-1, :]
-                # markers lye in the stream like this: 00..00100..00300..00200..00100..00300..00 where 1 indicated the start of a left movement,
-                # 2 the start of a right movement and 3 the end of a movement (RESTing state)
-                end_idx = None
-                start_idx = 0
-                for i in range(len(marker_data)):
-                    if marker_data[i] == 1 or marker_data[i] == 2:
-                        if end_idx is not None:  # resting state
-                            self.create_and_append_sample(eeg_data[:, start_idx:end_idx], 3)
+            marker_data = data[-1, :]
+            # markers lye in the stream like this: 00..00100..00300..00200..00100..00300..00 where 1 indicated the start of a left movement,
+            # 2 the start of a right movement and 3 the end of a movement (RESTing state)
+            end_idx = None
+            start_idx = 0
+            for i in range(len(marker_data)):
+                if marker_data[i] == 1 or marker_data[i] == 2:
+                    if end_idx is not None:  # resting state
+                        self.create_and_append_sample(eeg_data[:, start_idx:end_idx], 3)
 
-                        start_idx = i
-                    elif marker_data[i] == 3:
-                        end_idx = i
-                        state = marker_data[start_idx]
-                        if state != 0:
-                            self.create_and_append_sample(eeg_data[:, start_idx:end_idx], int(state))
+                    start_idx = i
+                elif marker_data[i] == 3:
+                    end_idx = i
+                    state = marker_data[start_idx]
+                    if state != 0:
+                        self.create_and_append_sample(eeg_data[:, start_idx:end_idx], int(state))
 
     def create_and_append_sample(self, eeg_data, state):
         sample = EEGSample(eeg_data, state_to_idx[int(state)])
