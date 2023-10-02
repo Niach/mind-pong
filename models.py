@@ -1,10 +1,12 @@
 import os
 from dataclasses import dataclass
+from scipy.signal import detrend
 
 import numpy as np
 from brainflow import DataFilter, FilterTypes
 from torch import nn
 from torch.utils.data import Dataset
+from scipy.signal import welch
 
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -15,7 +17,16 @@ classes = ['REST', 'LEFT', 'RIGHT']
 @dataclass
 class EEGSample:
     data: np.ndarray
+    features: np.ndarray  # This will store our extracted features
     state: int
+
+
+def compute_band_power(eeg_data, fs, band):
+    """Compute the power in a frequency band using Welch's method."""
+    nperseg = min(fs, len(eeg_data))  # Use the length of the EEG data if it's shorter than the desired segment length
+    noverlap = int(nperseg * 0.5)  # Overlap by half the segment length
+    freqs, psd = welch(eeg_data, fs, nperseg=nperseg, noverlap=noverlap)
+    return np.sum(psd[(freqs >= band[0]) & (freqs <= band[1])])
 
 
 def map_samples(sample):
@@ -67,9 +78,9 @@ class EEGDataset(Dataset):
             data = DataFilter.read_file(os.path.join('data/raw', csv_file))
             eeg_data = data[:-1, :]
 
-            # plot_eeg(eeg_data, 'raw')
+            plot_eeg(eeg_data, 'raw')
             eeg_data = self.apply_filters(eeg_data)
-            # (eeg_data, 'filtered')
+            plot_eeg(eeg_data, 'filtered')
 
             marker_data = data[-1, :]
             # markers lye in the stream like this: 00..00100..00300..00200..00100..00300..00 where 1 indicated the start of a left movement,
@@ -89,7 +100,11 @@ class EEGDataset(Dataset):
                         self.create_and_append_sample(eeg_data[:, start_idx:end_idx], int(state))
 
     def create_and_append_sample(self, eeg_data, state):
-        sample = EEGSample(eeg_data, state_to_idx[int(state)])
+        alpha_power = DataFilter.get_band_power(eeg_data, 7.0, 13.0)
+        beta_power = DataFilter.get_band_power(eeg_data, 14.0, 30.0)
+        features = np.array([alpha_power, beta_power], dtype=np.float32)
+
+        sample = EEGSample(eeg_data, features, state_to_idx[int(state)])
         if len(sample.data[0]) > 250:
             self.samples.append(sample)
             wins, labs = map_samples(sample)
@@ -97,26 +112,33 @@ class EEGDataset(Dataset):
             self.window_labels.extend(labs)
 
     def apply_filters(self, eeg_data):
-        min_values = eeg_data.min(axis=1)[:, np.newaxis]
-        max_values = eeg_data.max(axis=1)[:, np.newaxis]
-        eeg_data = ((eeg_data - min_values) / (max_values - min_values)) * 200 - 100
+        # 1. Detrending
+        eeg_data_detrended = detrend(eeg_data, axis=1)
+
+        # 2. Z-score normalization
+        eeg_data_normalized = (eeg_data_detrended - np.mean(eeg_data_detrended, axis=1, keepdims=True)) / np.std(
+            eeg_data_detrended, axis=1, keepdims=True)
+
+        # 3. Artifact rejection (assuming your epochs are represented by the second dimension)
+        threshold = 100  # This value might need to be adjusted based on your data
+        valid_samples = np.all(np.abs(eeg_data_normalized) < threshold, axis=1)
+        eeg_data_cleaned = eeg_data_normalized[valid_samples]
 
         # Apply a notch filter at 50 Hz to remove powerline interference
-        for i in range(eeg_data.shape[0]):
-            DataFilter.perform_bandstop(eeg_data[i], 250, 48.0, 52.0, 4,
-                                        FilterTypes.BUTTERWORTH.value, 0)
+        for i in range(eeg_data_cleaned.shape[0]):
+            DataFilter.perform_bandstop(eeg_data_cleaned[i], 250, 48.0, 52.0, 4, FilterTypes.BUTTERWORTH.value, 0)
 
         # Apply a bandpass filter from 2-30 Hz to isolate the motor imagery related frequency components
-        for i in range(eeg_data.shape[0]):
-            DataFilter.perform_bandpass(eeg_data[i], 250, 2.0, 30.0, 4, FilterTypes.BUTTERWORTH.value, 0)
+        for i in range(eeg_data_cleaned.shape[0]):
+            DataFilter.perform_bandpass(eeg_data_cleaned[i], 250, 2.0, 30.0, 4, FilterTypes.BUTTERWORTH.value, 0)
 
-        return eeg_data
+        return eeg_data_cleaned
 
     def __len__(self):
         return len(self.windows)
 
     def __getitem__(self, idx):
-        data = self.windows[idx]
+        data = self.windows[idx].features  # We are now returning features instead of raw EEG data
         label = self.window_labels[idx]
         return data, label
 
