@@ -9,6 +9,7 @@ from models import EEGDataset, EEGNet
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
+import matplotlib.pyplot as plt
 
 
 # This will be the early stopping function
@@ -65,7 +66,7 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs):
             print(f'Early stopping on epoch {epoch}')
             break
 
-    return model
+    return model, train_losses, val_losses
 
 
 def evaluate(model, test_loader):
@@ -80,6 +81,18 @@ def evaluate(model, test_loader):
             correct += (predicted == labels).sum().item()
     print(f'Accuracy: {100 * correct / total}%')
     return 100 * correct / total
+
+
+def plot_losses(train_losses, val_losses):
+    epochs = range(1, len(train_losses) + 1)
+    plt.plot(epochs, train_losses, label='Training Loss', marker='o')
+    plt.plot(epochs, val_losses, label='Validation Loss', marker='o')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Training and Validation Losses')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
 
 def train_run():
@@ -104,8 +117,10 @@ def train_run():
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
 
-    model = train(model, train_loader, val_loader, criterion, optimizer, 500)
+    model, train_losses, val_losses = train(model, train_loader, val_loader, criterion, optimizer, 500)
     acc = evaluate(model, test_loader)
+
+    plot_losses(train_losses, val_losses)
 
     # Predict
 
