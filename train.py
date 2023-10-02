@@ -53,6 +53,7 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs):
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()
         val_losses.append(val_loss / len(val_loader))
+        print(f'Val loss: {val_loss / len(val_loader)}')
 
         # Check for early stopping
         if val_loss < best_val_loss:
