@@ -1,4 +1,3 @@
-
 import time
 
 import torch
@@ -66,6 +65,7 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs):
 
     return model
 
+
 def evaluate(model, test_loader):
     correct = 0
     total = 0
@@ -80,7 +80,6 @@ def evaluate(model, test_loader):
     return 100 * correct / total
 
 
-
 def train_run():
     dataset = EEGDataset()
 
@@ -88,6 +87,10 @@ def train_run():
     train_size = int(0.7 * len(dataset))
     val_size = int(0.1 * len(dataset))
     test_size = len(dataset) - train_size - val_size
+
+    print("train size:", train_size)
+    print("val size:", val_size)
+    print("test size:", test_size)
 
     train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
@@ -113,21 +116,23 @@ def train_run():
     print("avg inference time:", (end - start) / 50)
     return model, acc
 
+
 if __name__ == '__main__':
     min_acc = 100
     max_acc = 0
     sum_acc = 0
     max_model = None
     for i in range(5):
-        model, curr = train_run()
-        if curr < min_acc:
-            min_acc = curr
-        if curr > max_acc:
-            max_acc = curr
-            max_model = model
-        sum_acc += curr
+        # model, curr = train_run()
+        train_run()
+        # if curr < min_acc:
+        #   min_acc = curr
+        # if curr > max_acc:
+        #    max_acc = curr
+        #   max_model = model
+        # sum_acc += curr
     print("min:", min_acc)
     print("max:", max_acc)
     print("avg:", sum_acc / 5)
-    torch.save(max_model.state_dict(), "model.pt")
+    # torch.save(max_model.state_dict(), "model.pt")
     print("saved best model")

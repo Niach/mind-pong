@@ -60,7 +60,7 @@ class Player(pygame.Rect):
     def calc(self, keys, dt, board):
 
         if keys[pygame.K_LCTRL]:
-            self.vx = -300
+            self.vx = -150
             self.beep_right.stop()
             self.beep_left.play()
             self.last_right_pressed = False
@@ -71,7 +71,7 @@ class Player(pygame.Rect):
                 print("LEFT")
 
         elif keys[pygame.K_RCTRL]:
-            self.vx = 300
+            self.vx = 150
             self.beep_left.stop()
             self.beep_right.play()
             self.last_left_pressed = False
@@ -102,7 +102,7 @@ class Ball(pygame.Rect):
     def __init__(self, x, y):
         super().__init__(x, y, WIDTH * BALL_WIDTH_MOD, HEIGHT * BALL_HEIGHT_MOD)
         self.vx = 0
-        self.vy = 250
+        self.vy = 125
 
     def render(self, screen):
         pygame.draw.rect(screen, "white", self)
@@ -119,11 +119,11 @@ class Ball(pygame.Rect):
 
         if self.colliderect(player):
             self.vy = -self.vy
-            self.vx = self.vx + random.randint(-100, 100)
-            if self.vx > 500:
-                self.vx = 500
-            elif self.vx < -500:
-                self.vx = -500
+            self.vx = self.vx + random.randint(-75, 75)
+            if self.vx > 250:
+                self.vx = 250
+            elif self.vx < -250:
+                self.vx = -250
 
         for box in boxes:
             if self.colliderect(box):
