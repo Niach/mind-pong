@@ -30,6 +30,7 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs):
     best_state_dict = None
 
     for epoch in range(epochs):
+        print(f'Epoch {epoch + 1}/{epochs}')
         # Training loop
         model.train()
         for inputs, labels in train_loader:
@@ -123,14 +124,14 @@ if __name__ == '__main__':
     sum_acc = 0
     max_model = None
     for i in range(5):
-        # model, curr = train_run()
+        model, curr = train_run()
         train_run()
-        # if curr < min_acc:
-        #   min_acc = curr
-        # if curr > max_acc:
-        #    max_acc = curr
-        #   max_model = model
-        # sum_acc += curr
+        if curr < min_acc:
+            min_acc = curr
+        if curr > max_acc:
+            max_acc = curr
+            max_model = model
+        sum_acc += curr
     print("min:", min_acc)
     print("max:", max_acc)
     print("avg:", sum_acc / 5)
